@@ -126,6 +126,145 @@
     color: var(--mustard);
     letter-spacing: 0.5px;
   }
+  .header-right{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .revenue-btn{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    color: var(--cream);
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+    cursor:pointer;
+    transition: all .2s ease;
+  }
+  .revenue-btn:hover{ border-color: rgba(203,161,53,0.5); transform: translateY(-1px); }
+
+  .revenue-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background: rgba(10,9,7,0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 50;
+    align-items:center;
+    justify-content:center;
+    padding: 20px;
+  }
+  .revenue-overlay.open{ display:flex; }
+  .revenue-panel{
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 12px;
+    max-width: 440px;
+    width:100%;
+    max-height: 82vh;
+    display:flex;
+    flex-direction:column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow:hidden;
+  }
+  .revenue-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 18px 20px 8px;
+  }
+  .revenue-header h2{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    margin:0;
+  }
+  .revenue-close{
+    background:none;
+    border:none;
+    font-size:18px;
+    cursor:pointer;
+    color:#5c5c50;
+    padding:4px;
+  }
+  .revenue-date{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:#5c5c50;
+    padding: 0 20px 12px;
+  }
+  .revenue-summary{
+    display:flex;
+    gap:10px;
+    padding: 0 20px 14px;
+  }
+  .revenue-stat{
+    flex:1;
+    background: rgba(0,0,0,0.05);
+    border-radius:8px;
+    padding: 12px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .revenue-stat-label{
+    font-size:11px;
+    color:#5c5c50;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+  }
+  .revenue-stat-value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:20px;
+    font-weight:700;
+  }
+  .revenue-list{
+    flex:1;
+    overflow-y:auto;
+    padding: 0 20px;
+    border-top: 1px dashed #9a9484;
+    margin-top:2px;
+  }
+  .revenue-entry{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 10px 0;
+    border-bottom: 1px dashed #d8d0b8;
+    font-size:13px;
+  }
+  .revenue-entry-info{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .revenue-entry-table{
+    font-weight:600;
+  }
+  .revenue-entry-time{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:#8a8474;
+  }
+  .revenue-entry-sum{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+  }
+  .revenue-empty{
+    text-align:center;
+    color:#8a8474;
+    font-size:13px;
+    padding: 24px 0;
+  }
+  .revenue-reset{
+    margin: 14px 20px 20px;
+    flex:none;
+  }
   .layout{
     display:flex;
     flex:1;
@@ -576,8 +715,33 @@
       <h1>Обедно меню — Каса</h1>
     </div>
   </div>
-  <div class="date" id="today"></div>
+  <div class="header-right">
+    <button class="revenue-btn" onclick="openRevenue()">📊 Оборот</button>
+    <div class="date" id="today"></div>
+  </div>
 </header>
+
+<div class="revenue-overlay" id="revenueOverlay" onclick="if(event.target===this) closeRevenue()">
+  <div class="revenue-panel">
+    <div class="revenue-header">
+      <h2>Оборот за деня</h2>
+      <button class="revenue-close" onclick="closeRevenue()">✕</button>
+    </div>
+    <div class="revenue-date" id="revenueDate"></div>
+    <div class="revenue-summary">
+      <div class="revenue-stat">
+        <span class="revenue-stat-label">Общо приходи</span>
+        <span class="revenue-stat-value" id="revenueTotal">0,00 €</span>
+      </div>
+      <div class="revenue-stat">
+        <span class="revenue-stat-label">Приключени сметки</span>
+        <span class="revenue-stat-value" id="revenueCount">0</span>
+      </div>
+    </div>
+    <div class="revenue-list" id="revenueList"></div>
+    <button class="btn btn-clear revenue-reset" onclick="resetRevenue()">Нулирай оборота за деня</button>
+  </div>
+</div>
 
 <div class="layout">
 
@@ -740,6 +904,102 @@ function loadState(){
   }
 }
 
+// ---------- daily revenue log ----------
+const REVENUE_KEY = 'kasa_gulyata_revenue_v1';
+let revenueLog = { date: '', entries: [] };
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function loadRevenue(){
+  try{
+    const raw = localStorage.getItem(REVENUE_KEY);
+    if(raw){
+      const data = JSON.parse(raw);
+      if(data && data.date === todayStr()){
+        revenueLog = data;
+        return;
+      }
+    }
+  }catch(e){
+    console.warn('Не успях да прочета оборота:', e);
+  }
+  revenueLog = { date: todayStr(), entries: [] };
+  saveRevenue();
+}
+
+function saveRevenue(){
+  try{
+    localStorage.setItem(REVENUE_KEY, JSON.stringify(revenueLog));
+  }catch(e){
+    console.warn('Не успях да запазя оборота:', e);
+  }
+}
+
+function logSale(tableLabel, total){
+  if(!total || total <= 0) return;
+  if(revenueLog.date !== todayStr()){
+    revenueLog = { date: todayStr(), entries: [] };
+  }
+  const now = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  revenueLog.entries.push({ table: tableLabel, total, time: timeStr });
+  saveRevenue();
+}
+
+function openRevenue(){
+  if(revenueLog.date !== todayStr()){
+    revenueLog = { date: todayStr(), entries: [] };
+    saveRevenue();
+  }
+  renderRevenue();
+  document.getElementById('revenueOverlay').classList.add('open');
+}
+
+function closeRevenue(){
+  document.getElementById('revenueOverlay').classList.remove('open');
+}
+
+function renderRevenue(){
+  const months = ['януари','февруари','март','април','май','юни','юли','август','септември','октомври','ноември','декември'];
+  const d = new Date();
+  document.getElementById('revenueDate').textContent = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+
+  const total = revenueLog.entries.reduce((s, e)=> s + e.total, 0);
+  document.getElementById('revenueTotal').textContent = fmt(total);
+  document.getElementById('revenueCount').textContent = revenueLog.entries.length;
+
+  const list = document.getElementById('revenueList');
+  list.innerHTML = '';
+  if(revenueLog.entries.length === 0){
+    list.innerHTML = '<div class="revenue-empty">Още няма приключени сметки днес.</div>';
+    return;
+  }
+  [...revenueLog.entries].reverse().forEach(entry=>{
+    const row = document.createElement('div');
+    row.className = 'revenue-entry';
+    row.innerHTML = `
+      <div class="revenue-entry-info">
+        <span class="revenue-entry-table">${entry.table}</span>
+        <span class="revenue-entry-time">${entry.time}</span>
+      </div>
+      <span class="revenue-entry-sum">${fmt(entry.total)}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function resetRevenue(){
+  if(revenueLog.entries.length === 0) return;
+  if(confirm('Да нулирам ли целия оборот за деня? Това изтрива списъка с приключени сметки.')){
+    revenueLog = { date: todayStr(), entries: [] };
+    saveRevenue();
+    renderRevenue();
+  }
+}
+
 function onReceivedChange(val){
   receivedAmounts[activeTable] = val;
   updateChangeDisplay();
@@ -899,6 +1159,9 @@ function removeItem(name){
 function clearTable(){
   if(Object.keys(tables[activeTable]).length === 0) return;
   if(confirm('Да изчистя ли бележката за ' + (tableNames[activeTable] || ('маса ' + activeTable)) + '?')){
+    let total = 0;
+    Object.values(tables[activeTable]).forEach(({price, qty})=>{ total += price*qty; });
+    logSale(tableNames[activeTable] || ('Маса ' + activeTable), total);
     tables[activeTable] = {};
     receivedAmounts[activeTable] = '';
     renderReceipt();
@@ -973,6 +1236,7 @@ function renderDate(){
 
 renderDate();
 loadState();
+loadRevenue();
 renderTabs();
 renderMenu();
 renderRail();
