@@ -218,11 +218,14 @@
     padding: 14px 16px 10px;
     border-bottom: 1px solid var(--line);
     flex-wrap:wrap;
+    max-height: 148px;
+    overflow-y:auto;
   }
   .table-chip{
-    font-family:'IBM Plex Mono', monospace;
-    font-size:13px;
-    padding: 7px 12px;
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    font-weight:600;
+    padding: 9px 14px;
     border-radius: 6px 6px 2px 2px;
     background: #1b261e;
     border: 1px solid var(--line);
@@ -230,7 +233,7 @@
     color: var(--cream);
     cursor:pointer;
     position:relative;
-    opacity:0.7;
+    opacity:0.75;
   }
   .table-chip.active{
     border-top-color: var(--mustard);
@@ -303,11 +306,23 @@
   }
   .receipt .sub{
     text-align:center;
-    font-size:11px;
-    color:#5c5c50;
+    font-size:16px;
+    font-weight:700;
+    color: var(--ink);
     margin-bottom:10px;
-    letter-spacing:0.5px;
+    letter-spacing:0.8px;
+    font-family:'Fraunces', serif;
   }
+  .rename-btn{
+    background:none;
+    border:none;
+    color:#8a8474;
+    cursor:pointer;
+    font-size:12px;
+    padding:0;
+    vertical-align:middle;
+  }
+  .rename-btn:hover{ color:#2a2a24; }
   .receipt hr{
     border:none;
     border-top: 1px dashed #9a9484;
@@ -510,6 +525,7 @@ const MENU = {
     ["Ракия (100мл)", 3.07],
     ["Водка (100мл)", 3.68],
     ["Мастика (100мл)", 3.07],
+    ["Облак", 3.50],
     ["Узо (100мл)", 4.91],
     ["Уиски Ballantine's (100мл)", 5.22],
     ["Бира (бутилка)", 1.84],
@@ -518,11 +534,22 @@ const MENU = {
   ]
 };
 
-const TABLE_COUNT = 8;
+const TABLE_COUNT = 30;
 let tables = {};
-for(let i=1;i<=TABLE_COUNT;i++){ tables[i] = {}; }
+let tableNames = {};
+for(let i=1;i<=TABLE_COUNT;i++){ tables[i] = {}; tableNames[i] = 'Маса ' + i; }
 let activeTable = 1;
 let activeCat = "Обедно меню";
+
+function renameTable(i){
+  const current = tableNames[i];
+  const next = prompt('Ново име за масата:', current);
+  if(next !== null && next.trim() !== ''){
+    tableNames[i] = next.trim();
+    renderRail();
+    renderReceipt();
+  }
+}
 
 function fmt(n){
   return n.toFixed(2).replace('.', ',') + ' €';
@@ -585,7 +612,7 @@ function removeItem(name){
 
 function clearTable(){
   if(Object.keys(tables[activeTable]).length === 0) return;
-  if(confirm('Да изчистя ли бележката за маса ' + activeTable + '?')){
+  if(confirm('Да изчистя ли бележката за ' + (tableNames[activeTable] || ('маса ' + activeTable)) + '?')){
     tables[activeTable] = {};
     renderReceipt();
     renderRail();
@@ -619,7 +646,8 @@ function renderReceipt(){
     wrap.appendChild(row);
   });
 
-  document.getElementById('tableLabel').textContent = 'МАСА ' + activeTable;
+  document.getElementById('tableLabel').innerHTML = (tableNames[activeTable] || ('Маса ' + activeTable)).toUpperCase() +
+    ' <button class="rename-btn" onclick="renameTable(' + activeTable + ')" title="Преименувай масата">✎</button>';
   document.getElementById('totalSum').textContent = fmt(total);
 }
 
@@ -634,8 +662,10 @@ function renderRail(){
     const hasItems = Object.keys(tables[i]).length > 0;
     const chip = document.createElement('button');
     chip.className = 'table-chip' + (i===activeTable ? ' active':'') + (hasItems ? ' has-items':'');
-    chip.innerHTML = 'Маса ' + i + '<span class="dot"></span>';
+    chip.innerHTML = (tableNames[i] || ('Маса ' + i)) + '<span class="dot"></span>';
+    chip.title = 'Двоен клик за преименуване';
     chip.onclick = ()=>{ activeTable = i; renderRail(); renderReceipt(); };
+    chip.ondblclick = (e)=>{ e.stopPropagation(); renameTable(i); };
     rail.appendChild(chip);
   }
 }
