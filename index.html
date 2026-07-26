@@ -650,6 +650,7 @@ const MENU = {
 };
 
 const TABLE_COUNT = 30;
+const STORAGE_KEY = 'kasa_gulyata_state_v1';
 let tables = {};
 let tableNames = {};
 let receivedAmounts = {};
@@ -657,9 +658,40 @@ for(let i=1;i<=TABLE_COUNT;i++){ tables[i] = {}; tableNames[i] = 'Маса ' + i
 let activeTable = 1;
 let activeCat = "Обедно меню";
 
+function saveState(){
+  try{
+    const data = { tables, tableNames, receivedAmounts, activeTable, activeCat };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }catch(e){
+    console.warn('Не успях да запазя данните локално:', e);
+  }
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(data.tables) tables = data.tables;
+    if(data.tableNames) tableNames = data.tableNames;
+    if(data.receivedAmounts) receivedAmounts = data.receivedAmounts;
+    if(data.activeTable) activeTable = data.activeTable;
+    if(data.activeCat && MENU[data.activeCat]) activeCat = data.activeCat;
+    // fill in any missing tables (e.g. if TABLE_COUNT increased since last save)
+    for(let i=1;i<=TABLE_COUNT;i++){
+      if(!tables[i]) tables[i] = {};
+      if(!tableNames[i]) tableNames[i] = 'Маса ' + i;
+      if(receivedAmounts[i] === undefined) receivedAmounts[i] = '';
+    }
+  }catch(e){
+    console.warn('Не успях да прочета запазените данни:', e);
+  }
+}
+
 function onReceivedChange(val){
   receivedAmounts[activeTable] = val;
   updateChangeDisplay();
+  saveState();
 }
 
 function updateChangeDisplay(){
@@ -697,6 +729,7 @@ function renameTable(i){
     tableNames[i] = next.trim();
     renderRail();
     renderReceipt();
+    saveState();
   }
 }
 
@@ -711,7 +744,7 @@ function renderTabs(){
     const b = document.createElement('button');
     b.className = 'tab' + (cat===activeCat ? ' active':'');
     b.textContent = cat;
-    b.onclick = ()=>{ activeCat = cat; renderTabs(); renderMenu(); };
+    b.onclick = ()=>{ activeCat = cat; renderTabs(); renderMenu(); saveState(); };
     wrap.appendChild(b);
   });
 }
@@ -742,6 +775,7 @@ function addItem(name, price, btnEl){
   t[name].qty += 1;
   renderReceipt();
   renderRail();
+  saveState();
   if(btnEl){
     btnEl.classList.remove('border-flash');
     void btnEl.offsetWidth; // restart animation if clicked rapidly
@@ -756,12 +790,14 @@ function changeQty(name, delta){
   if(t[name].qty <= 0){ delete t[name]; }
   renderReceipt();
   renderRail();
+  saveState();
 }
 
 function removeItem(name){
   delete tables[activeTable][name];
   renderReceipt();
   renderRail();
+  saveState();
 }
 
 function clearTable(){
@@ -771,6 +807,7 @@ function clearTable(){
     receivedAmounts[activeTable] = '';
     renderReceipt();
     renderRail();
+    saveState();
   }
 }
 
@@ -822,7 +859,7 @@ function renderRail(){
     chip.className = 'table-chip' + (i===activeTable ? ' active':'') + (hasItems ? ' has-items':'');
     chip.innerHTML = (tableNames[i] || ('Маса ' + i)) + '<span class="dot"></span>';
     chip.title = 'Двоен клик за преименуване';
-    chip.onclick = ()=>{ activeTable = i; renderRail(); renderReceipt(); };
+    chip.onclick = ()=>{ activeTable = i; renderRail(); renderReceipt(); saveState(); };
     chip.ondblclick = (e)=>{ e.stopPropagation(); renameTable(i); };
     rail.appendChild(chip);
   }
@@ -839,6 +876,7 @@ function renderDate(){
 }
 
 renderDate();
+loadState();
 renderTabs();
 renderMenu();
 renderRail();
