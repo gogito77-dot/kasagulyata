@@ -239,6 +239,49 @@
   }
   .grid.alcohol .item-price{ color: var(--brick); }
 
+  .weight-item{
+    cursor:default;
+    gap:8px;
+  }
+  .weight-controls{
+    display:flex;
+    gap:6px;
+    margin-top:2px;
+  }
+  .weight-controls input{
+    width: 0;
+    flex: 1;
+    min-width:0;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--cream);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    outline:none;
+  }
+  .weight-controls input::placeholder{ color: rgba(239,233,216,0.4); }
+  .weight-controls input::-webkit-outer-spin-button,
+  .weight-controls input::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  .weight-add-btn{
+    flex-shrink:0;
+    background: linear-gradient(135deg, #dbb646, var(--mustard) 60%);
+    color:#1e1a10;
+    border:none;
+    border-radius:6px;
+    padding: 6px 12px;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .weight-add-btn:hover{ filter: brightness(1.08); }
+  .weight-add-btn:active{ transform: scale(0.96); }
+
   /* ---------- RIGHT: ticket / receipt ---------- */
   .ticket-side{
     flex: 1;
@@ -628,7 +671,7 @@ const MENU = {
     ["Сафрид (300г)", 4.60],
     ["Скумрия (100г)", 2.80],
     ["Пастърва (100г)", 3.20],
-    ["Лаврак", 11.84]
+    ["Лаврак (100г)", 3.20]
   ],
   "Скара": [
     ["Пилешко шишче", 2.30],
@@ -764,13 +807,57 @@ function renderMenu(){
   const grid = document.createElement('div');
   grid.className = 'grid' + (activeCat === 'Алкохолни напитки' ? ' alcohol':'');
   MENU[activeCat].forEach(([name, price])=>{
-    const btn = document.createElement('button');
-    btn.className = 'item-btn';
-    btn.innerHTML = `<span class="item-name">${name}</span><span class="item-price">${fmt(price)}</span>`;
-    btn.onclick = (e)=> addItem(name, price, e.currentTarget);
-    grid.appendChild(btn);
+    if(activeCat === 'Риба' && name.includes('(100г)')){
+      // weight-based item: cashier types the grams, price is computed automatically
+      const baseName = name.replace(' (100г)', '').trim();
+      const card = document.createElement('div');
+      card.className = 'item-btn weight-item';
+      const inputId = 'w_' + baseName.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_');
+      card.innerHTML = `
+        <span class="item-name">${baseName}</span>
+        <span class="item-price">${fmt(price)} / 100г</span>
+        <div class="weight-controls">
+          <input type="number" inputmode="decimal" min="0" step="1" placeholder="грама" id="${inputId}">
+          <button class="weight-add-btn" type="button">Добави</button>
+        </div>
+      `;
+      const input = card.querySelector('input');
+      const addBtn = card.querySelector('.weight-add-btn');
+      const doAdd = ()=>{
+        const grams = parseFloat((input.value || '').toString().replace(',', '.'));
+        if(!grams || grams <= 0){ input.focus(); return; }
+        addWeightedItem(baseName, price, grams, addBtn);
+        input.value = '';
+        input.focus();
+      };
+      addBtn.onclick = doAdd;
+      input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); doAdd(); } });
+      grid.appendChild(card);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'item-btn';
+      btn.innerHTML = `<span class="item-name">${name}</span><span class="item-price">${fmt(price)}</span>`;
+      btn.onclick = (e)=> addItem(name, price, e.currentTarget);
+      grid.appendChild(btn);
+    }
   });
   area.appendChild(grid);
+}
+
+function addWeightedItem(baseName, pricePer100g, grams, btnEl){
+  const unitPrice = Math.round(pricePer100g * grams / 100 * 100) / 100;
+  const itemName = `${baseName} (${grams}г)`;
+  const t = tables[activeTable];
+  if(!t[itemName]){ t[itemName] = {price: unitPrice, qty:0}; }
+  t[itemName].qty += 1;
+  renderReceipt();
+  renderRail();
+  saveState();
+  if(btnEl){
+    btnEl.classList.remove('border-flash');
+    void btnEl.offsetWidth;
+    btnEl.classList.add('border-flash');
+  }
 }
 
 function addItem(name, price, btnEl){
