@@ -131,6 +131,95 @@
     align-items:center;
     gap:14px;
   }
+  .waiter-badge{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(203,161,53,0.25), rgba(203,161,53,0.08));
+    color: var(--cream);
+    border: 1px solid rgba(203,161,53,0.4);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .waiter-badge:hover{ border-color: rgba(203,161,53,0.7); }
+
+  .login-overlay{
+    display:flex;
+    position:fixed;
+    inset:0;
+    background: rgba(10,9,7,0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 100;
+    align-items:center;
+    justify-content:center;
+    padding: 20px;
+  }
+  .login-overlay.hidden{ display:none; }
+  .login-panel{
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 16px;
+    max-width: 320px;
+    width:100%;
+    padding: 32px 26px 24px;
+    text-align:center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-title{
+    font-family:'Fraunces', serif;
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:4px;
+  }
+  .login-sub{
+    font-size:12.5px;
+    color:#5c5c50;
+    margin-bottom:18px;
+  }
+  .pin-input{
+    width:100%;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:32px;
+    letter-spacing:14px;
+    text-align:center;
+    padding: 12px 0 12px 14px;
+    border-radius:10px;
+    border:1px solid #b7b09c;
+    background:#e8e0c8;
+    color:#2a2a24;
+    outline:none;
+    margin-bottom:14px;
+  }
+  .login-submit{ width:100%; margin-bottom:10px; }
+  .login-newwaiter{
+    background:none;
+    border:none;
+    color:#5c5c50;
+    font-size:12.5px;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:4px;
+  }
+  .login-list{
+    margin-top:16px;
+    padding-top:12px;
+    border-top: 1px dashed #9a9484;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:center;
+  }
+  .login-list-item{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    padding:4px 8px;
+    border-radius:6px;
+    background:rgba(0,0,0,0.06);
+    color:#5c5c50;
+  }
   .revenue-btn{
     font-family:'Inter', sans-serif;
     font-size:13px;
@@ -716,11 +805,23 @@
     </div>
   </div>
   <div class="header-right">
+    <div class="waiter-badge" id="waiterBadge" onclick="openLogin(false)">👤 —</div>
     <button class="revenue-btn" onclick="openOpenBills()">📑 Отворени сметки</button>
     <button class="revenue-btn" onclick="openRevenue()">📊 Оборот</button>
     <div class="date" id="today"></div>
   </div>
 </header>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-panel">
+    <div class="login-title">Код на сервитьора</div>
+    <div class="login-sub" id="loginSub">Въведи своя 4-цифрен код</div>
+    <input type="tel" inputmode="numeric" maxlength="4" id="pinInput" class="pin-input" placeholder="••••" autocomplete="off">
+    <button class="btn btn-print login-submit" onclick="submitPin()">Вход</button>
+    <button class="login-newwaiter" onclick="addWaiterPrompt()">+ Нов сервитьор</button>
+    <div class="login-list" id="loginList"></div>
+  </div>
+</div>
 
 <div class="revenue-overlay" id="openBillsOverlay" onclick="if(event.target===this) closeOpenBills()">
   <div class="revenue-panel">
@@ -982,7 +1083,7 @@ function logSale(tableLabel, total){
   }
   const now = new Date();
   const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  revenueLog.entries.push({ table: tableLabel, total, time: timeStr });
+  revenueLog.entries.push({ table: tableLabel, total, time: timeStr, waiter: currentWaiter || '' });
   saveRevenue();
 }
 
@@ -1077,7 +1178,7 @@ function renderRevenue(){
     row.innerHTML = `
       <div class="revenue-entry-info">
         <span class="revenue-entry-table">${entry.table}</span>
-        <span class="revenue-entry-time">${entry.time}</span>
+        <span class="revenue-entry-time">${entry.time}${entry.waiter ? ' · ' + entry.waiter : ''}</span>
       </div>
       <span class="revenue-entry-sum">${fmt(entry.total)}</span>
     `;
@@ -1322,6 +1423,95 @@ function printReceipt(){
   window.print();
 }
 
+// ---------- waiters / PIN login ----------
+const WAITERS_KEY = 'kasa_waiters_v1';
+let waiters = {};        // { "1234": "Иван", ... }
+let currentWaiter = '';  // resets on every page load/reopen
+
+function loadWaiters(){
+  try{
+    const raw = localStorage.getItem(WAITERS_KEY);
+    if(raw) waiters = JSON.parse(raw);
+  }catch(e){
+    console.warn('Не успях да прочета сервитьорите:', e);
+  }
+}
+
+function saveWaiters(){
+  try{
+    localStorage.setItem(WAITERS_KEY, JSON.stringify(waiters));
+  }catch(e){
+    console.warn('Не успях да запазя сервитьорите:', e);
+  }
+}
+
+function renderWaiterBadge(){
+  document.getElementById('waiterBadge').textContent = currentWaiter ? ('👤 ' + currentWaiter) : '👤 —';
+}
+
+function renderLoginList(){
+  const list = document.getElementById('loginList');
+  const names = Object.values(waiters);
+  if(names.length === 0){
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = names.map(n => `<span class="login-list-item">${n}</span>`).join('');
+}
+
+function openLogin(){
+  document.getElementById('pinInput').value = '';
+  document.getElementById('loginSub').textContent = Object.keys(waiters).length
+    ? 'Въведи своя 4-цифрен код'
+    : 'Няма регистрирани сервитьори — добави първия';
+  renderLoginList();
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  setTimeout(()=> document.getElementById('pinInput').focus(), 50);
+}
+
+function closeLogin(){
+  document.getElementById('loginOverlay').classList.add('hidden');
+}
+
+function submitPin(){
+  const pin = document.getElementById('pinInput').value.trim();
+  if(!/^\d{4}$/.test(pin)){
+    document.getElementById('loginSub').textContent = 'Кодът трябва да е точно 4 цифри';
+    return;
+  }
+  if(waiters[pin]){
+    currentWaiter = waiters[pin];
+    renderWaiterBadge();
+    closeLogin();
+  } else {
+    const name = prompt('Този код не е регистриран. Име на новия сервитьор:');
+    if(name && name.trim() !== ''){
+      waiters[pin] = name.trim();
+      saveWaiters();
+      currentWaiter = name.trim();
+      renderWaiterBadge();
+      closeLogin();
+    }
+  }
+}
+
+function addWaiterPrompt(){
+  const name = prompt('Име на новия сервитьор:');
+  if(!name || name.trim() === '') return;
+  let pin = prompt('4-цифрен код за ' + name.trim() + ':');
+  if(!pin || !/^\d{4}$/.test(pin.trim())){
+    alert('Кодът трябва да е точно 4 цифри.');
+    return;
+  }
+  waiters[pin.trim()] = name.trim();
+  saveWaiters();
+  renderLoginList();
+}
+
+document.getElementById('pinInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); submitPin(); }
+});
+
 function renderDate(){
   const d = new Date();
   const months = ['януари','февруари','март','април','май','юни','юли','август','септември','октомври','ноември','декември'];
@@ -1331,10 +1521,13 @@ function renderDate(){
 renderDate();
 loadState();
 loadRevenue();
+loadWaiters();
 renderTabs();
 renderMenu();
 renderRail();
 renderReceipt();
+renderWaiterBadge();
+openLogin();
 </script>
 
 </body>
