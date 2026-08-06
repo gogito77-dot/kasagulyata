@@ -404,6 +404,91 @@
   .weight-add-btn:hover{ filter: brightness(1.08); }
   .weight-add-btn:active{ transform: scale(0.96); }
 
+  .daily-item{
+    cursor:default;
+    gap:8px;
+    min-height: 96px;
+  }
+  .daily-name{
+    width:100%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 6px;
+    padding: 7px 9px;
+    color: var(--cream);
+    font-family:'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight:500;
+    outline:none;
+  }
+  .daily-name::placeholder{ color: rgba(236,229,211,0.35); }
+  .daily-bottom{
+    display:flex;
+    gap:6px;
+    align-items:center;
+  }
+  .daily-price-wrap{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    flex:1;
+    min-width:0;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 6px;
+    padding: 6px 9px;
+  }
+  .daily-price-wrap span{
+    color: var(--mustard);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+  }
+  .daily-price{
+    width:0;
+    flex:1;
+    min-width:0;
+    background:none;
+    border:none;
+    color: var(--mustard);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    text-align:right;
+    outline:none;
+  }
+  .daily-price::placeholder{ color: rgba(203,161,53,0.4); }
+  .daily-price::-webkit-outer-spin-button,
+  .daily-price::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  .daily-add-btn{
+    flex-shrink:0;
+    background: linear-gradient(135deg, #dbb646, var(--mustard) 60%);
+    color:#1e1a10;
+    border:none;
+    border-radius:6px;
+    padding: 7px 13px;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .daily-add-btn:hover{ filter: brightness(1.08); }
+  .daily-add-btn:active{ transform: scale(0.96); }
+  .daily-clear-all{
+    margin-top:16px;
+    background: rgba(165,83,60,0.08);
+    color: var(--danger);
+    border:1px solid rgba(165,83,60,0.45);
+    border-radius:8px;
+    padding: 9px 16px;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .daily-clear-all:hover{ background: rgba(165,83,60,0.18); }
+
   /* ---------- RIGHT: ticket / receipt ---------- */
   .ticket-side{
     flex: 1;
@@ -902,10 +987,11 @@ let receivedAmounts = {};
 for(let i=1;i<=TABLE_COUNT;i++){ tables[i] = {}; tableNames[i] = 'Маса ' + i; receivedAmounts[i] = ''; }
 let activeTable = 1;
 let activeCat = "Обедно меню";
+let dailyMenu = Array.from({length: 12}, ()=>({name:'', price:''}));
 
 function saveState(){
   try{
-    const data = { tables, tableNames, receivedAmounts, activeTable, activeCat };
+    const data = { tables, tableNames, receivedAmounts, activeTable, activeCat, dailyMenu };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }catch(e){
     console.warn('Не успях да запазя данните локално:', e);
@@ -921,7 +1007,12 @@ function loadState(){
     if(data.tableNames) tableNames = data.tableNames;
     if(data.receivedAmounts) receivedAmounts = data.receivedAmounts;
     if(data.activeTable) activeTable = data.activeTable;
-    if(data.activeCat && MENU[data.activeCat]) activeCat = data.activeCat;
+    if(data.activeCat && (MENU[data.activeCat] || data.activeCat === 'Дневно меню')) activeCat = data.activeCat;
+    if(Array.isArray(data.dailyMenu)) dailyMenu = data.dailyMenu;
+    // fill in any missing daily menu slots
+    for(let i=0;i<12;i++){
+      if(!dailyMenu[i]) dailyMenu[i] = {name:'', price:''};
+    }
     // fill in any missing tables (e.g. if TABLE_COUNT increased since last save)
     for(let i=1;i<=TABLE_COUNT;i++){
       if(!tables[i]) tables[i] = {};
@@ -1135,10 +1226,13 @@ function fmt(n){
   return n.toFixed(2).replace('.', ',') + ' €';
 }
 
+const DAILY_CAT = 'Дневно меню';
+const DAILY_SLOTS = 12;
+
 function renderTabs(){
   const wrap = document.getElementById('catTabs');
   wrap.innerHTML = '';
-  Object.keys(MENU).forEach(cat=>{
+  [DAILY_CAT, ...Object.keys(MENU)].forEach(cat=>{
     const b = document.createElement('button');
     b.className = 'tab' + (cat===activeCat ? ' active':'');
     b.textContent = cat;
@@ -1147,9 +1241,76 @@ function renderTabs(){
   });
 }
 
+function renderDailyMenu(area){
+  const label = document.createElement('div');
+  label.className = 'cat-label';
+  label.textContent = DAILY_CAT + ' — попълни за днес';
+  area.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+
+  for(let i=0;i<DAILY_SLOTS;i++){
+    const slot = dailyMenu[i] || {name:'', price:''};
+    const card = document.createElement('div');
+    card.className = 'item-btn daily-item';
+    card.innerHTML = `
+      <input class="daily-name" type="text" placeholder="Име на ястието" value="${(slot.name||'').replace(/"/g,'&quot;')}">
+      <div class="daily-bottom">
+        <div class="daily-price-wrap">
+          <input class="daily-price" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" value="${slot.price !== '' && slot.price !== undefined ? slot.price : ''}">
+          <span>€</span>
+        </div>
+        <button class="daily-add-btn" type="button">Добави</button>
+      </div>
+    `;
+    const nameInput = card.querySelector('.daily-name');
+    const priceInput = card.querySelector('.daily-price');
+    const addBtn = card.querySelector('.daily-add-btn');
+
+    const persist = ()=>{
+      dailyMenu[i] = { name: nameInput.value.trim(), price: priceInput.value };
+      saveState();
+    };
+    nameInput.addEventListener('input', persist);
+    priceInput.addEventListener('input', persist);
+
+    const doAdd = ()=>{
+      const name = nameInput.value.trim();
+      const price = parseFloat((priceInput.value||'').toString().replace(',', '.'));
+      if(!name){ nameInput.focus(); return; }
+      if(!price || price <= 0){ priceInput.focus(); return; }
+      addItem(name, price, card);
+    };
+    addBtn.onclick = doAdd;
+    priceInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); doAdd(); } });
+
+    grid.appendChild(card);
+  }
+  area.appendChild(grid);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'daily-clear-all';
+  clearBtn.textContent = 'Изчисти дневното меню';
+  clearBtn.onclick = ()=>{
+    if(confirm('Да изчистя ли всички редове от дневното меню?')){
+      dailyMenu = Array.from({length: DAILY_SLOTS}, ()=>({name:'', price:''}));
+      saveState();
+      renderMenu();
+    }
+  };
+  area.appendChild(clearBtn);
+}
+
 function renderMenu(){
   const area = document.getElementById('menuArea');
   area.innerHTML = '';
+
+  if(activeCat === DAILY_CAT){
+    renderDailyMenu(area);
+    return;
+  }
+
   const label = document.createElement('div');
   label.className = 'cat-label';
   label.textContent = activeCat;
