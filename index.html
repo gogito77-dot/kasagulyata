@@ -987,7 +987,7 @@ let receivedAmounts = {};
 for(let i=1;i<=TABLE_COUNT;i++){ tables[i] = {}; tableNames[i] = 'Маса ' + i; receivedAmounts[i] = ''; }
 let activeTable = 1;
 let activeCat = "Обедно меню";
-let dailyMenu = Array.from({length: 12}, ()=>({name:'', price:''}));
+let dailyMenu = Array.from({length: 14}, ()=>({name:'', price:''}));
 
 function saveState(){
   try{
@@ -1010,7 +1010,7 @@ function loadState(){
     if(data.activeCat && (MENU[data.activeCat] || data.activeCat === 'Дневно меню')) activeCat = data.activeCat;
     if(Array.isArray(data.dailyMenu)) dailyMenu = data.dailyMenu;
     // fill in any missing daily menu slots
-    for(let i=0;i<12;i++){
+    for(let i=0;i<14;i++){
       if(!dailyMenu[i]) dailyMenu[i] = {name:'', price:''};
     }
     // fill in any missing tables (e.g. if TABLE_COUNT increased since last save)
@@ -1227,7 +1227,7 @@ function fmt(n){
 }
 
 const DAILY_CAT = 'Дневно меню';
-const DAILY_SLOTS = 12;
+const DAILY_SLOTS = 14;
 
 function renderTabs(){
   const wrap = document.getElementById('catTabs');
