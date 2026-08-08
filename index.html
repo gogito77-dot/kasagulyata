@@ -475,8 +475,28 @@
   }
   .daily-add-btn:hover{ filter: brightness(1.08); }
   .daily-add-btn:active{ transform: scale(0.96); }
-  .daily-clear-all{
+  .daily-btn-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
     margin-top:16px;
+  }
+  .daily-share-btn{
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    color: var(--cream);
+    border:1px solid rgba(255,255,255,0.16);
+    border-radius:8px;
+    padding: 9px 16px;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .daily-share-btn:hover{ border-color: rgba(203,161,53,0.5); }
+  .daily-clear-all{
+    margin-top:0;
     background: rgba(165,83,60,0.08);
     color: var(--danger);
     border:1px solid rgba(165,83,60,0.45);
@@ -1289,6 +1309,19 @@ function renderDailyMenu(area){
   }
   area.appendChild(grid);
 
+  const btnRow = document.createElement('div');
+  btnRow.className = 'daily-btn-row';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'daily-share-btn';
+  copyBtn.textContent = '📤 Копирай меню';
+  copyBtn.onclick = ()=> copyDailyMenu();
+
+  const pasteBtn = document.createElement('button');
+  pasteBtn.className = 'daily-share-btn';
+  pasteBtn.textContent = '📥 Постави меню';
+  pasteBtn.onclick = ()=> pasteDailyMenu();
+
   const clearBtn = document.createElement('button');
   clearBtn.className = 'daily-clear-all';
   clearBtn.textContent = 'Изчисти дневното меню';
@@ -1299,7 +1332,76 @@ function renderDailyMenu(area){
       renderMenu();
     }
   };
-  area.appendChild(clearBtn);
+
+  btnRow.appendChild(copyBtn);
+  btnRow.appendChild(pasteBtn);
+  btnRow.appendChild(clearBtn);
+  area.appendChild(btnRow);
+}
+
+function dailyMenuToText(){
+  const lines = dailyMenu
+    .filter(s => s && (s.name||'').trim() !== '')
+    .map(s => `${s.name.trim()}|${s.price}`);
+  return 'МЕНЮ:' + lines.join(';');
+}
+
+function copyDailyMenu(){
+  const text = dailyMenuToText();
+  if(text === 'МЕНЮ:'){
+    alert('Дневното меню е празно — няма какво да се копира.');
+    return;
+  }
+  const done = ()=> alert('Менюто е копирано! Прати го по WhatsApp/Viber на другите телефони, а там натисни „Постави меню".');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=> fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ prompt('Копирай този код и го прати:', text); }
+  document.body.removeChild(ta);
+}
+
+function pasteDailyMenu(){
+  const text = prompt('Постави кода на менюто тук:');
+  if(!text) return;
+  const raw = text.trim();
+  if(!raw.startsWith('МЕНЮ:')){
+    alert('Това не изглежда като код на меню. Кодът започва с „МЕНЮ:".');
+    return;
+  }
+  const body = raw.slice('МЕНЮ:'.length);
+  const parts = body ? body.split(';') : [];
+  const fresh = Array.from({length: DAILY_SLOTS}, ()=>({name:'', price:''}));
+  let count = 0;
+  parts.forEach((p, idx)=>{
+    if(idx >= DAILY_SLOTS) return;
+    const sep = p.lastIndexOf('|');
+    if(sep === -1) return;
+    const name = p.slice(0, sep).trim();
+    const price = p.slice(sep+1).trim();
+    if(!name) return;
+    fresh[idx] = { name, price };
+    count++;
+  });
+  if(count === 0){
+    alert('Кодът е празен или повреден.');
+    return;
+  }
+  dailyMenu = fresh;
+  saveState();
+  renderMenu();
+  alert('Готово! Заредени са ' + count + ' ястия.');
 }
 
 function renderMenu(){
