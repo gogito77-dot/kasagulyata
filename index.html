@@ -741,9 +741,11 @@
     display:flex;
     gap:8px;
     padding: 10px 16px 18px;
+    flex-wrap:wrap;
   }
   .btn{
     flex:1;
+    min-width: 96px;
     padding: 12px 10px;
     border-radius:10px;
     border:none;
@@ -754,6 +756,12 @@
     transition: transform .15s ease, box-shadow .2s ease;
   }
   .btn:active{ transform: scale(0.97); }
+  .btn-kitchen{
+    background: linear-gradient(135deg, rgba(124,148,115,0.9), rgba(96,120,88,0.85));
+    color:#f2f5ef;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 4px 14px rgba(0,0,0,0.25);
+  }
+  .btn-kitchen:hover{ filter: brightness(1.1); }
   .btn-print{
     background: linear-gradient(135deg, #dbb646, var(--mustard) 60%);
     color:#1e1a10;
@@ -889,6 +897,7 @@
       </div>
     </div>
     <div class="actions">
+      <button class="btn btn-kitchen" onclick="kitchenOrder()">🍳 Кухня</button>
       <button class="btn btn-print" onclick="printReceipt()">Печат / Приключи</button>
       <button class="btn btn-clear" onclick="clearTable()">Изчисти</button>
     </div>
@@ -1570,6 +1579,33 @@ function renderRail(){
     chip.onclick = ()=>{ activeTable = i; renderRail(); renderReceipt(); saveState(); };
     chip.ondblclick = (e)=>{ e.stopPropagation(); renameTable(i); };
     rail.appendChild(chip);
+  }
+}
+
+function kitchenOrder(){
+  const t = tables[activeTable];
+  const names = Object.keys(t);
+  if(names.length === 0){
+    alert('Няма поръчка на тази маса.');
+    return;
+  }
+  const now = new Date();
+  const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const label = (tableNames[activeTable] || ('Маса ' + activeTable)).toUpperCase();
+
+  let text = '*** ' + label + ' ***\n';
+  text += timeStr + '\n';
+  text += '--------------------\n';
+  names.forEach(name=>{
+    text += t[name].qty + ' x ' + name + '\n';
+  });
+  text += '--------------------\n';
+
+  const done = ()=> alert('Поръчката е копирана!\n\nОтвори приложението на принтера и я постави там за печат.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=> fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
   }
 }
 
